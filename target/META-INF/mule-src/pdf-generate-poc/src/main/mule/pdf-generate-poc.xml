@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:java="http://www.mulesoft.org/schema/mule/java"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="b2cd4951-8442-4a22-bbb5-be20b8d086c5" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="875dcfea-df77-4a81-ae76-6afaa7c9ce69" >
+		<file:connection workingDir="C:\Users\Lenovo\Desktop\fileoperations" />
+	</file:config>
+	<flow name="pdf-generate-pocFlow" doc:id="cc640084-8dbe-4c10-81e3-4d8a1d7dd3d4" >
+		<http:listener doc:name="Listener" doc:id="ea8e2667-42ed-443f-82b7-0f373831bba0" path="/createPdf" config-ref="HTTP_Listener_config"/>
+		<logger level="INFO" doc:name="START" doc:id="15893c20-0d64-4a14-b8c5-67d30c407427" message="START"/>
+		<set-variable value="${app.home}/simple.pdf" doc:name="Set Path" doc:id="f8cc9dec-3c86-4b00-a769-6a35e9c49904" variableName="setPath"/>
+		<ee:transform doc:name="Transform Message" doc:id="f5151259-bb9c-421f-8d1c-8d6281ef6bd9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+table: {
+	(payload map(item,index)->tr:
+		{
+			td: item.firstName,
+			td: item.lastName,
+			td: item.age,
+			td: item.address
+		}
+	)
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<parse-template doc:name="Parse Template" doc:id="3c02b1cc-3c9c-4441-a694-94960f27e1fc" outputMimeType="text/html">
+			<content>&lt;html&gt;
+&lt;head&gt;
+&lt;style&gt;
+body {background-color: powderblue;}
+table, th, td {
+  border: 1px solid black;
+  width:75%;
+  margin-left: 25px
+}
+td:nth-child(even), th:nth-child(even) {
+  background-color: #D6EEEE;
+}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1 style=&quot;font-size:25px; color: red; text-align: center&quot;&gt; Customer Information Report&lt;/h1&gt;
+#[payload]
+&lt;/body&gt;
+&lt;/html&gt;</content>
+		</parse-template>
+		<java:invoke-static doc:id="092f1e47-56de-45eb-87bf-73373e68c65e" class="com.pdf.app.App" method="createpdf(java.lang.String,java.lang.String)">
+			<java:args><![CDATA[#[{
+	args: payload as String,
+	path: vars.setPath as String
+}]]]></java:args>
+		</java:invoke-static>
+		<file:write doc:id="cb8e850b-cbdc-4756-bba2-2f9bdb28ed5f" config-ref="File_Config" path="simple.pdf" />
+		<ee:transform doc:name="success response" doc:id="4e098232-94ee-4670-86ba-9791fcb2a665" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status": "Success",
+	"message": "PDF file is created successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="END" doc:id="1b4b4c66-9b07-4553-867d-5e9372f02934" message="END"/>
+	</flow>
+</mule>
